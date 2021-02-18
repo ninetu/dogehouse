@@ -1,0 +1,87 @@
+version: "3"
+services:
+  rabbitmq:
+    container_name: d_rabbitmq
+    image: rabbitmq:3.8.12-alpine
+    ports:
+      - "5672:5672"
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 30s
+      retries: 3
+  postgres:
+    container_name: d_postgres
+    image: postgres:13-alpine
+    env_file: .env
+    # environment: 
+    #   - POSTGRES_USER=
+    #   - POSTGRES_PASSWORD=
+    #   - POSTGRE_DB=
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on: 
+      rabbitmq:
+        condition: service_healthy
+  kousa:
+    container_name: d_kousa
+    build: 
+      context: ./kousa
+      dockerfile: Dockerfile
+    depends_on: 
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    # environment:
+    #   - postgres_URL=
+    #   - BEN_GITHUB_ID=
+    #   - RABBITMQ_URL=
+    #   - SENTRY_DSN=
+    #   - GITHUB_CLIENT_ID=
+    #   - GITHUB_CLIENT_SECRET=
+    #   - ACCESS_TOKEN_SECRET=
+    #   - REFRESH_TOKEN_SECRET=
+    #   - WEB_URL=
+    #   - API_URL=
+#    ports:
+#      - "4001:4001"
+    network_mode: host
+
+  # voice-server
+  shawarma:
+    container_name: d_shawarma
+    build:
+      context: ./shawarma
+      dockerfile: Dockerfile
+    env_file: .env
+    # environment:
+    #   - RABBITMQ_URL=
+    #   - WEBRTC_LISTEN_IP=
+    #   - A_IP=
+    depends_on: 
+      - kousa
+    network_mode: host
+
+  # frontend
+  kofta:
+    container_name: d_kofta
+    build:
+      context: .
+      dockerfile: Dockerfile.kofta
+    env_file: .env
+    # environment:
+    #   - REACT_APP_API_BASE_URL=
+    ports:
+      - "3000:3000"
+    depends_on:
+      - kousa
+
+volumes:
+  dbdata:
